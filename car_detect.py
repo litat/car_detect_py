@@ -17,7 +17,8 @@ class Cars(object):
 
 	notifyDistance = 100
 
-	trackbarName = "my velocity"
+	myVTrackbarName = "My Velocity"
+	notifyDistanceTrackbarName = "Notify Distance"
 	display_output_window_name = "Display Output"
 
 	def __init__(self):
@@ -52,31 +53,36 @@ class Cars(object):
 			else:
 				if self.myV > self.otherV:
 					color = (0, 0, 255)
-					self.drawRectangle(rect, color)
 					self.drawExclamationMark(rect, color)
 				else:
-					if self.myV == self.otherV and self.myV > distance / 2:
+					if self.myV > distance / 2:
 						color = (0, 0, 255)
-						self.drawRectangle(rect, color)
 						self.drawExclamationMark(rect, color)
 					else:
 						color = (0, 255, 0)
 						self.drawRectangle(rect, color)
 
 	def drawRectangle(self, rect, color):
+		height, width, channels = self.image_main_result.shape
+		blank = np.zeros((height, width, channels), np.uint8)
 		width = rect[2] / 40
 		pt1 = (rect[0], rect[1])
 		pt2 = (rect[0] + rect[2], rect[1] + rect[3])
-		cv2.rectangle(self.image_main_result, pt1, pt2, color, width)
+		cv2.rectangle(blank, pt1, pt2, color, width)
+		self.image_main_result = cv2.addWeighted(self.image_main_result, 1,
+		                                         blank, 0.5, 0)
 
 	def drawExclamationMark(self, rect, color):
+		height, width, channels = self.image_main_result.shape
+		blank = np.zeros((height, width, channels), np.uint8)
+
 		rect_center = (rect[0] + rect[2] / 2, rect[1] + rect[3] / 2)
 		times = (rect[2] / 30, 0)[0]
 		exclamationMarkUpper = [
-			[-2 * times + rect_center[0], -7 * times + rect_center[1]],
-			[-2 * times + rect_center[0], 2 * times + rect_center[1]],
-			[2 * times + rect_center[0], 2 * times + rect_center[1]],
-			[2 * times + rect_center[0], -7 * times + rect_center[1]]]
+			[-2 * times + rect_center[0], -8 * times + rect_center[1]],
+			[-2 * times + rect_center[0], 1 * times + rect_center[1]],
+			[2 * times + rect_center[0], 1 * times + rect_center[1]],
+			[2 * times + rect_center[0], -8 * times + rect_center[1]]]
 		exclamationMarkLower = [
 			[-2 * times + rect_center[0], 3 * times + rect_center[1]],
 			[-2 * times + rect_center[0], 7 * times + rect_center[1]],
@@ -85,42 +91,56 @@ class Cars(object):
 		exclamationMarkUpper = np.array(exclamationMarkUpper, np.int32)
 		exclamationMarkLower = np.array(exclamationMarkLower, np.int32)
 
-		cv2.fillPoly(self.image_main_result, [exclamationMarkUpper], color)
-		cv2.fillPoly(self.image_main_result, [exclamationMarkLower], color)
+		cv2.fillPoly(blank, [exclamationMarkUpper], color)
+		cv2.fillPoly(blank, [exclamationMarkLower], color)
 
-	def onTrackbraChange(self, value):
+		self.image_main_result = cv2.addWeighted(self.image_main_result, 1,
+		                                         blank, 100, 0)
+
+	def onMyVTrackbarChange(self, value):
 		self.myV = value
-		print "my V: " + str(self.myV)
-		print "other V: " + str(self.otherV)
+
+	def onNotifyDistanceChange(self, value):
+		self.notifyDistance = value
 
 	def display_output(self):
 		if self.image_main_result is None:
 			return
+		cv2.putText(self.image_main_result, "My Velocity: " + str(self.myV),
+		            (0, 20), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1, cv.CV_AA)
+		cv2.putText(self.image_main_result, "Other's Velocity: " + str(self.otherV),
+		            (0, 40), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1, cv.CV_AA)
+		cv2.putText(self.image_main_result,
+		            "Notify Distance: " + str(self.notifyDistance),
+		            (0, 60), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1, cv.CV_AA)
 		cv2.imshow(self.display_output_window_name, self.image_main_result)
-		cv.CreateTrackbar(self.trackbarName, self.display_output_window_name,
-		                  30, 200, self.onTrackbraChange)
+		cv.CreateTrackbar(self.myVTrackbarName,
+		                  self.display_output_window_name,
+		                  self.myV, 200, self.onMyVTrackbarChange)
+		cv.CreateTrackbar(self.notifyDistanceTrackbarName,
+		                  self.display_output_window_name,
+		                  self.notifyDistance, 100, self.onNotifyDistanceChange)
 
 	def findcars(self):
 		img = self.storage
 		if img is None:
 			print "Image is empty."
 		gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-		gray = cv2.GaussianBlur(gray, (7, 7), 3)
-		resize_image = gray
-		cars = self.cascade.detectMultiScale(resize_image, 1.1, 15, 0, (20, 30))
+		treatedImg = treatImg(gray)
+		cars = self.cascade.detectMultiScale(treatedImg, 1.1, 15, 0, (20, 30))
 		input_rectangles = []
 		for car in cars:
 			car_x, car_y, car_w, car_h = car
 			margin = 15
-			resize_image_reg_of_interest = resize_image[
+			treatedImgROI = treatedImg[
 				car_y + margin:car_y + margin + car_h + margin,
 				car_x + margin:car_x + margin + car_w + margin]
 			nested_cars = self.checkcascade.detectMultiScale(
-				resize_image_reg_of_interest,
+				treatedImgROI,
 				1.1, 1, 0, (5, 50))
 			if len(nested_cars) > 0:
 				input_rectangles.append(car)
-				# cv2.imshow('roi', resize_image_reg_of_interest)
+				# cv2.imshow('roi', treatedImgROI)
 				# cv2.waitKey(0)
 		self.drawMarks(input_rectangles)
 
@@ -136,9 +156,14 @@ class Cars(object):
 			self.cascade_load(cas)
 
 
+def treatImg(image):
+	image = cv2.GaussianBlur(image, (3, 3), 3)
+	return image
+
+
 def calDistance(rect):
 	width = rect[2]
-	return 22726 * math.pow(width, -0.9776)
+	return 2272.6 * math.pow(width, -0.9776)
 
 
 def videoCaptureWrap(file_name, callback):
@@ -170,5 +195,7 @@ def run_find_car(image):
 # main
 detectcars = Cars()
 input_file_name = sys.argv[1]
-videoCaptureWrap(input_file_name, run_find_car)
-imageReadWrap(input_file_name, run_find_car)
+if "mp4" in input_file_name:
+	videoCaptureWrap(input_file_name, run_find_car)
+elif "jpg" in input_file_name or "png" in input_file_name:
+	imageReadWrap(input_file_name, run_find_car)
