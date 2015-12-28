@@ -1,8 +1,8 @@
 import sys
+import math
 import cv2
 import cv
 import numpy as np
-import math
 
 
 class Cars(object):
@@ -12,7 +12,7 @@ class Cars(object):
 	storage = None
 	image_main_result = None
 
-	myV = 30
+	my_v = 30
 	otherV = 80
 
 	notifyDistance = 100
@@ -44,23 +44,21 @@ class Cars(object):
 
 	def drawMarks(self, input_rectangles):
 		input_rectangles = np.array(input_rectangles).tolist()
-		input_rectangles, weights = cv2.groupRectangles(input_rectangles, 0, 100)
+		input_rectangles, _ = cv2.groupRectangles(input_rectangles, 0, 100)
 		for rect in input_rectangles:
 			distance = calDistance(rect)
 			if distance < self.notifyDistance:
 				color = (0, 0, 255)
 				self.drawExclamationMark(rect, color)
+			elif self.my_v > self.otherV:
+				color = (0, 0, 255)
+				self.drawExclamationMark(rect, color)
+			elif self.my_v > distance / 2:
+				color = (0, 0, 255)
+				self.drawExclamationMark(rect, color)
 			else:
-				if self.myV > self.otherV:
-					color = (0, 0, 255)
-					self.drawExclamationMark(rect, color)
-				else:
-					if self.myV > distance / 2:
-						color = (0, 0, 255)
-						self.drawExclamationMark(rect, color)
-					else:
-						color = (0, 255, 0)
-						self.drawRectangle(rect, color)
+				color = (0, 255, 0)
+				self.drawRectangle(rect, color)
 
 	def drawRectangle(self, rect, color):
 		height, width, channels = self.image_main_result.shape
@@ -70,7 +68,7 @@ class Cars(object):
 		pt2 = (rect[0] + rect[2], rect[1] + rect[3])
 		cv2.rectangle(blank, pt1, pt2, color, width)
 		self.image_main_result = cv2.addWeighted(self.image_main_result, 1,
-		                                         blank, 0.5, 0)
+																						 blank, 0.5, 0)
 
 	def drawExclamationMark(self, rect, color):
 		height, width, channels = self.image_main_result.shape
@@ -95,31 +93,31 @@ class Cars(object):
 		cv2.fillPoly(blank, [exclamationMarkLower], color)
 
 		self.image_main_result = cv2.addWeighted(self.image_main_result, 1,
-		                                         blank, 100, 0)
+																						 blank, 100, 0)
 
-	def onMyVTrackbarChange(self, value):
-		self.myV = value
+	def whenMyVTrackbarChange(self, value):
+		self.my_v = value
 
-	def onNotifyDistanceChange(self, value):
+	def whenNotifyDistanceChange(self, value):
 		self.notifyDistance = value
 
 	def display_output(self):
 		if self.image_main_result is None:
 			return
-		cv2.putText(self.image_main_result, "My Velocity: " + str(self.myV),
-		            (0, 20), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1, cv.CV_AA)
+		cv2.putText(self.image_main_result, "My Velocity: " + str(self.my_v),
+								(0, 20), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1, cv.CV_AA)
 		cv2.putText(self.image_main_result, "Other's Velocity: " + str(self.otherV),
-		            (0, 40), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1, cv.CV_AA)
+								(0, 40), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1, cv.CV_AA)
 		cv2.putText(self.image_main_result,
-		            "Notify Distance: " + str(self.notifyDistance),
-		            (0, 60), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1, cv.CV_AA)
+								"Notify Distance: " + str(self.notifyDistance),
+								(0, 60), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1, cv.CV_AA)
 		cv2.imshow(self.display_output_window_name, self.image_main_result)
 		cv.CreateTrackbar(self.myVTrackbarName,
-		                  self.display_output_window_name,
-		                  self.myV, 200, self.onMyVTrackbarChange)
+											self.display_output_window_name,
+											self.my_v, 200, self.whenMyVTrackbarChange)
 		cv.CreateTrackbar(self.notifyDistanceTrackbarName,
-		                  self.display_output_window_name,
-		                  self.notifyDistance, 100, self.onNotifyDistanceChange)
+											self.display_output_window_name,
+											self.notifyDistance, 100, self.whenNotifyDistanceChange)
 
 	def findcars(self):
 		img = self.storage
@@ -170,7 +168,7 @@ def videoCaptureWrap(file_name, callback):
 	capture = cv2.VideoCapture(file_name)
 	if capture.isOpened():
 		while True:
-			ret, image = capture.read()
+			_, image = capture.read()
 			if image is None:
 				break
 			callback(image)
@@ -188,14 +186,14 @@ def imageReadWrap(file_name, callback):
 
 
 def run_find_car(image):
-	detectcars.getImage(image)
-	detectcars.findcars()
-	detectcars.display_output()
+	DETECTCARS.getImage(image)
+	DETECTCARS.findcars()
+	DETECTCARS.display_output()
 
 # main
-detectcars = Cars()
-input_file_name = sys.argv[1]
-if "mp4" in input_file_name:
-	videoCaptureWrap(input_file_name, run_find_car)
-elif "jpg" in input_file_name or "png" in input_file_name:
-	imageReadWrap(input_file_name, run_find_car)
+DETECTCARS = Cars()
+INPUT_FILE_NAME = sys.argv[1]
+if "mp4" in INPUT_FILE_NAME:
+	videoCaptureWrap(INPUT_FILE_NAME, run_find_car)
+elif "jpg" in INPUT_FILE_NAME or "png" in INPUT_FILE_NAME:
+	imageReadWrap(INPUT_FILE_NAME, run_find_car)
