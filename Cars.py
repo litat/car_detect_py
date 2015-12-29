@@ -2,13 +2,18 @@ import math
 import cv2
 import cv
 import numpy as np
+import car_cascade as cc
+import car_light as cl
 
 
 class Cars(object):
 	"""docstring for Cars"""
+	def __init__(self):
+		self.car_cascade = cc.CarCascade()
+		self.car_light = cl.CarLight()
 
 	sourceImage = None
-	storage = None
+	filterImage = None
 	mainOutput = None
 
 	my_v = 30
@@ -16,34 +21,38 @@ class Cars(object):
 
 	notifyDistance = 100
 
+	is_day = False
+
 	myVTrackbarName = "My Velocity"
 	notifyDistanceTrackbarName = "Notify Distance"
 	mainOutputWindowName = "Display Output"
 
-	def __init__(self):
-		self.cascade = cv2.CascadeClassifier()
-		self.checkcascade = cv2.CascadeClassifier()
-		self.load_cascade()
-
-	def getImage(self, src):
-		if src is None:
-			print "src not filled"
+	def getImage(self, image):
+		if image is None:
+			print "image not filled"
 			return
-		self.sourceImage = src
-		self.mainOutput = src
+		self.sourceImage = image
+		self.mainOutput = image
+		self.car_cascade.getImage(image)
+		self.car_light.getImage(image)
 
-	def cascade_load(self, cascade_string):
-		if self.cascade.load(cascade_string) is None:
-			print "Could not load classifier cascade"
+	def findcars(self):
+		self.car_light.filterCarLight()
+		self.car_cascade.filterCars()
+		self.is_day = np.mean(self.car_light.thresholdImage) > 20
 
-	def checkcascade_load(self, checkcascade_string):
-		if self.checkcascade.load(checkcascade_string) is None:
-			print "Could not load classifier cascade"
+		if self.is_day:
+			output_rectangles = self.car_cascade.output_rectangles
+			self.filterImage = self.mainOutput
+		else:
+			output_rectangles = self.car_light.output_rectangles
+			self.filterImage = np.zeros(self.mainOutput.shape, np.uint8)
+		self.drawMarks(output_rectangles)
 
-	def drawMarks(self, input_rectangles):
-		input_rectangles = np.array(input_rectangles).tolist()
-		input_rectangles, _ = cv2.groupRectangles(input_rectangles, 0, 100)
-		for rect in input_rectangles:
+	def drawMarks(self, rectangles):
+		rectangles = np.array(rectangles).tolist()
+		rectangles, _ = cv2.groupRectangles(rectangles, 0, 100)
+		for rect in rectangles:
 			distance = calDistance(rect)
 			rect_x, rect_y, width = getRectXYWitdth(rect)
 			if distance < self.notifyDistance:
@@ -60,21 +69,17 @@ class Cars(object):
 				self.drawRectangle(rect, color)
 
 	def drawRectangle(self, rect, color):
-		height, width, channels = self.mainOutput.shape
-		blank = np.zeros((height, width, channels), np.uint8)
+		# blank = np.zeros(self.mainOutput.shape, np.uint8)
 		width = rect[2] / 40
 		pt1 = (rect[0], rect[1])
 		pt2 = (rect[0] + rect[2], rect[1] + rect[3])
-		cv2.rectangle(blank, pt1, pt2, color, width)
-		self.mainOutput = cv2.addWeighted(self.mainOutput, 1, blank, 0.5, 0)
+		cv2.rectangle(self.filterImage, pt1, pt2, color, width)
+		# self.mainOutput = cv2.addWeighted(self.filterImage, 1, blank, 0.5, 0)
 
-	def drawExclamationMark(self, rect_x, rect_y, width, color):
-		times = width
-		height, width, channels = self.mainOutput.shape
-		blank = np.zeros((height, width, channels), np.uint8)
+	def drawExclamationMark(self, rect_x, rect_y, rect_width, color):
+		times = rect_width
+		blank = np.zeros(self.mainOutput.shape, np.uint8)
 
-		# rect_center = (rect[0] + rect[2] / 2, rect[1] + rect[3] / 2)
-		# times = (rect[2] / 30, 0)[0]
 		exclamationMarkUpper = [
 		                [-2 * times + rect_x, -8 * times + rect_y],
 		                [-2 * times + rect_x, 1 * times + rect_y],
@@ -88,29 +93,22 @@ class Cars(object):
 		exclamationMarkUpper = np.array(exclamationMarkUpper, np.int32)
 		exclamationMarkLower = np.array(exclamationMarkLower, np.int32)
 
-		cv2.fillPoly(blank, [exclamationMarkUpper], color)
-		cv2.fillPoly(blank, [exclamationMarkLower], color)
-		# cv2.imshow("blank", blank)
+		cv2.fillPoly(self.filterImage, [exclamationMarkUpper], color)
+		cv2.fillPoly(self.filterImage, [exclamationMarkLower], color)
 
-		self.mainOutput = cv2.addWeighted(self.mainOutput, 1, blank, 100, 0)
-
-	def blankAsMainOutput(self):
-		height, width, channels = self.mainOutput.shape
-		blank = np.zeros((height, width, channels), np.uint8)
-		return blank
-
-	def whenMyVTrackbarChange(self, value):
-		self.my_v = value
-
-	def whenNotifyDistanceChange(self, value):
-		self.notifyDistance = value
+		# self.mainOutput = cv2.addWeighted(self.filterImage, 1, blank, 1, 0)
 
 	def display_output(self):
 		if self.mainOutput is None:
 			return
-		self.display_text()
+		self.merge_outputs()
+		# self.display_text()
 		cv2.imshow(self.mainOutputWindowName, self.mainOutput)
-		self.display_trackbar()
+		# self.display_trackbar()
+
+	def merge_outputs(self):
+		if not self.is_day:
+			self.mainOutput = cv2.addWeighted(self.mainOutput, 1, self.filterImage, 1, 0)
 
 	def display_text(self):
 		cv2.putText(self.mainOutput, "My Velocity: " + str(self.my_v),
@@ -129,35 +127,11 @@ class Cars(object):
 		                  self.mainOutputWindowName,
 		                  self.notifyDistance, 100, self.whenNotifyDistanceChange)
 
-	def findcars(self):
-		img = self.sourceImage
-		if img is None:
-			print "Image is empty."
-		gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-		treatedImg = treatImg(gray)
-		cars = self.cascade.detectMultiScale(treatedImg, 1.1, 15, 0, (20, 30))
-		input_rectangles = []
-		for car in cars:
-			car_x, car_y, car_w, car_h = car
-			margin = 15
-			treatedImgROI = treatedImg[car_y + margin:car_y + margin + car_h + margin,
-			                           car_x + margin:car_x + margin + car_w + margin]
-			nested_cars = self.checkcascade.detectMultiScale(treatedImgROI, 1.1, 1, 0, (5, 50))
-			if len(nested_cars) > 0:
-				input_rectangles.append(car)
-				# cv2.imshow('roi', treatedImgROI)
-				# cv2.waitKey(0)
-		self.drawMarks(input_rectangles)
+	def whenMyVTrackbarChange(self, value):
+		self.my_v = value
 
-	def load_cascade(self):
-		self.checkcascade_load("./cascades/checkcas.xml")
-
-		cascades = ["./cascades/cas1.xml",
-		            "./cascades/cas2.xml",
-		            "./cascades/cas3.xml",
-		            "./cascades/cas4.xml"]
-		for cas in cascades:
-			self.cascade_load(cas)
+	def whenNotifyDistanceChange(self, value):
+		self.notifyDistance = value
 
 
 def getRectXYWitdth(rect):
@@ -165,11 +139,6 @@ def getRectXYWitdth(rect):
 	rect_y = rect[1] + rect[3] / 2
 	width = (rect[2] / 30, 0)[0]
 	return rect_x, rect_y, width
-
-
-def treatImg(image):
-	image = cv2.GaussianBlur(image, (3, 3), 3)
-	return image
 
 
 def calDistance(rect):
