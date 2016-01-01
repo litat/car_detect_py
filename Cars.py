@@ -5,12 +5,15 @@ import numpy as np
 import car_cascade as cc
 import car_light as cl
 
+DASHBOARD_IMAGE_NAME = "dashboard.png"
 
 class Cars(object):
 	"""docstring for Cars"""
 	def __init__(self):
 		self.car_cascade = cc.CarCascade()
 		self.car_light = cl.CarLight()
+		self.dashboard_image = cv2.imread(DASHBOARD_IMAGE_NAME)
+		self.display_text()
 
 	sourceImage = None
 	filterImage = None
@@ -26,6 +29,7 @@ class Cars(object):
 	myVTrackbarName = "My Velocity"
 	notifyDistanceTrackbarName = "Notify Distance"
 	mainOutputWindowName = "Display Output"
+	controlPanelWindowName = "Control Panel"
 
 	def getImage(self, image):
 		if image is None:
@@ -69,16 +73,13 @@ class Cars(object):
 				self.drawRectangle(rect, color)
 
 	def drawRectangle(self, rect, color):
-		# blank = np.zeros(self.mainOutput.shape, np.uint8)
 		width = rect[2] / 40
 		pt1 = (rect[0], rect[1])
 		pt2 = (rect[0] + rect[2], rect[1] + rect[3])
 		cv2.rectangle(self.filterImage, pt1, pt2, color, width)
-		# self.mainOutput = cv2.addWeighted(self.filterImage, 1, blank, 0.5, 0)
 
 	def drawExclamationMark(self, rect_x, rect_y, rect_width, color):
 		times = rect_width
-		blank = np.zeros(self.mainOutput.shape, np.uint8)
 
 		exclamationMarkUpper = [
 		                [-2 * times + rect_x, -8 * times + rect_y],
@@ -96,42 +97,59 @@ class Cars(object):
 		cv2.fillPoly(self.filterImage, [exclamationMarkUpper], color)
 		cv2.fillPoly(self.filterImage, [exclamationMarkLower], color)
 
-		# self.mainOutput = cv2.addWeighted(self.filterImage, 1, blank, 1, 0)
-
 	def display_output(self):
 		if self.mainOutput is None:
 			return
 		self.merge_outputs()
-		# self.display_text()
 		cv2.imshow(self.mainOutputWindowName, self.mainOutput)
-		# self.display_trackbar()
+		self.display_control_panel()
 
 	def merge_outputs(self):
 		if not self.is_day:
 			self.mainOutput = cv2.addWeighted(self.mainOutput, 1, self.filterImage, 1, 0)
 
+	def display_control_panel(self):
+		cv2.imshow(self.controlPanelWindowName, self.dashboard_image)
+		arrow_color = (0, 0, 255)
+		pt1, pt2 = self.calDashboardArrow()
+		cv2.line(self.dashboard_image, pt1, pt2, arrow_color, 3, cv2.CV_AA)
+		self.display_trackbar()
+
+	def calDashboardArrow(self):
+		pt1 = (200, 205)
+		dashboard_arrow_length = 120
+		degree = (157.5+self.my_v*1.125)*math.pi/180
+		pt2 = (int(pt1[0]+dashboard_arrow_length*math.cos(degree)),
+		       int(pt1[1]+dashboard_arrow_length*math.sin(degree)))
+		return pt1, pt2
+
 	def display_text(self):
-		cv2.putText(self.mainOutput, "My Velocity: " + str(self.my_v),
+		cv2.putText(self.dashboard_image, "My Velocity: " + str(self.my_v),
 		            (0, 20), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1, cv2.CV_AA)
-		cv2.putText(self.mainOutput, "Other's Velocity: " + str(self.otherV),
+		cv2.putText(self.dashboard_image, "Other's Velocity: " + str(self.otherV),
 		            (0, 40), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1, cv2.CV_AA)
-		cv2.putText(self.mainOutput,
+		cv2.putText(self.dashboard_image,
 		            "Notify Distance: " + str(self.notifyDistance),
 		            (0, 60), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1, cv2.CV_AA)
 
 	def display_trackbar(self):
 		cv.CreateTrackbar(self.myVTrackbarName,
-		                  self.mainOutputWindowName,
+		                  self.controlPanelWindowName,
 		                  self.my_v, 200, self.whenMyVTrackbarChange)
 		cv.CreateTrackbar(self.notifyDistanceTrackbarName,
-		                  self.mainOutputWindowName,
+		                  self.controlPanelWindowName,
 		                  self.notifyDistance, 100, self.whenNotifyDistanceChange)
 
 	def whenMyVTrackbarChange(self, value):
 		self.my_v = value
+		self.dashboard_image = cv2.imread(DASHBOARD_IMAGE_NAME)
+		self.display_control_panel()
+		self.display_text()
 
 	def whenNotifyDistanceChange(self, value):
 		self.notifyDistance = value
+		self.dashboard_image = cv2.imread(DASHBOARD_IMAGE_NAME)
+		self.display_text()
 
 
 def getRectXYWitdth(rect):
