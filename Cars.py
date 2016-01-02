@@ -149,14 +149,15 @@ class Cars(object):
 		self.my_v = value
 		self.dashboard_image = DASHBOARD_IMAGE.copy()
 		self.drawDashboardArrow()
-		self.display_control_panel()
 		self.display_text()
+		self.display_control_panel()
 
 	def whenNotifyDistanceChange(self, value):
 		self.notifyDistance = value
 		self.dashboard_image = DASHBOARD_IMAGE.copy()
 		self.drawDashboardArrow()
 		self.display_text()
+		self.display_control_panel()
 
 
 def getRectXYWitdth(rect):
