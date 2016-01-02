@@ -6,13 +6,15 @@ import car_cascade as cc
 import car_light as cl
 
 DASHBOARD_IMAGE_NAME = "dashboard.png"
+DASHBOARD_IMAGE = cv2.imread(DASHBOARD_IMAGE_NAME)
 
 class Cars(object):
 	"""docstring for Cars"""
 	def __init__(self):
 		self.car_cascade = cc.CarCascade()
 		self.car_light = cl.CarLight()
-		self.dashboard_image = cv2.imread(DASHBOARD_IMAGE_NAME)
+
+		self.dashboard_image = DASHBOARD_IMAGE.copy()
 		self.display_text()
 
 	sourceImage = None
@@ -110,10 +112,13 @@ class Cars(object):
 
 	def display_control_panel(self):
 		cv2.imshow(self.controlPanelWindowName, self.dashboard_image)
+		self.drawDashboardArrow()
+		self.display_trackbar()
+
+	def drawDashboardArrow(self):
 		arrow_color = (0, 0, 255)
 		pt1, pt2 = self.calDashboardArrow()
-		cv2.line(self.dashboard_image, pt1, pt2, arrow_color, 3, cv2.CV_AA)
-		self.display_trackbar()
+		cv2.line(self.dashboard_image, pt1, pt2, arrow_color, 4, cv2.CV_AA)
 
 	def calDashboardArrow(self):
 		pt1 = (200, 205)
@@ -130,7 +135,7 @@ class Cars(object):
 		            (0, 40), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1, cv2.CV_AA)
 		cv2.putText(self.dashboard_image,
 		            "Notify Distance: " + str(self.notifyDistance),
-		            (0, 60), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1, cv2.CV_AA)
+		            (200, 20), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1, cv2.CV_AA)
 
 	def display_trackbar(self):
 		cv.CreateTrackbar(self.myVTrackbarName,
@@ -138,17 +143,19 @@ class Cars(object):
 		                  self.my_v, 200, self.whenMyVTrackbarChange)
 		cv.CreateTrackbar(self.notifyDistanceTrackbarName,
 		                  self.controlPanelWindowName,
-		                  self.notifyDistance, 100, self.whenNotifyDistanceChange)
+		                  self.notifyDistance, 200, self.whenNotifyDistanceChange)
 
 	def whenMyVTrackbarChange(self, value):
 		self.my_v = value
-		self.dashboard_image = cv2.imread(DASHBOARD_IMAGE_NAME)
+		self.dashboard_image = DASHBOARD_IMAGE.copy()
+		self.drawDashboardArrow()
 		self.display_control_panel()
 		self.display_text()
 
 	def whenNotifyDistanceChange(self, value):
 		self.notifyDistance = value
-		self.dashboard_image = cv2.imread(DASHBOARD_IMAGE_NAME)
+		self.dashboard_image = DASHBOARD_IMAGE.copy()
+		self.drawDashboardArrow()
 		self.display_text()
 
 
