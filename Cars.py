@@ -8,6 +8,7 @@ import car_light as cl
 DASHBOARD_IMAGE_NAME = "dashboard.png"
 DASHBOARD_IMAGE = cv2.imread(DASHBOARD_IMAGE_NAME)
 
+
 class Cars(object):
 	"""docstring for Cars"""
 	def __init__(self):
@@ -16,6 +17,9 @@ class Cars(object):
 
 		self.dashboard_image = DASHBOARD_IMAGE.copy()
 		self.display_text()
+
+		self.display_control_panel()
+		cv2.moveWindow(self.controlPanelWindowName, 900, 400)
 
 	sourceImage = None
 	filterImage = None
@@ -52,6 +56,7 @@ class Cars(object):
 			self.filterImage = self.mainOutput
 		else:
 			output_rectangles = self.car_light.output_rectangles
+			# self.filterImage = self.mainOutput
 			self.filterImage = np.zeros(self.mainOutput.shape, np.uint8)
 		self.drawMarks(output_rectangles)
 
@@ -72,7 +77,7 @@ class Cars(object):
 				self.drawExclamationMark(rect_x, rect_y, width, color)
 			else:
 				color = (0, 255, 0)
-				self.drawRectangle(rect, color)
+				self.drawCarIcon(rect_x, rect_y, width, color)
 
 	def drawRectangle(self, rect, color):
 		width = rect[2] / 40
@@ -80,19 +85,42 @@ class Cars(object):
 		pt2 = (rect[0] + rect[2], rect[1] + rect[3])
 		cv2.rectangle(self.filterImage, pt1, pt2, color, width)
 
+	def drawCarIcon(self, rect_x, rect_y, rect_width, color):
+		times = rect_width / 1.2
+		carIcon = [[-5 * times + rect_x, -7 * times + rect_y],
+								[-7 * times + rect_x, -4 * times + rect_y],
+								[-9 * times + rect_x, -4 * times + rect_y],
+								[-9 * times + rect_x, -2 * times + rect_y],
+								[-8 * times + rect_x, -2 * times + rect_y],
+								[-8 * times + rect_x, 0 * times + rect_y],
+								[-8 * times + rect_x, 7 * times + rect_y],
+								[-6 * times + rect_x, 7 * times + rect_y],
+								[-6 * times + rect_x, 5 * times + rect_y],
+								[6 * times + rect_x, 5 * times + rect_y],
+								[6 * times + rect_x, 7 * times + rect_y],
+								[8 * times + rect_x, 7 * times + rect_y],
+								[8 * times + rect_x, 0 * times + rect_y],
+								[8 * times + rect_x, -2 * times + rect_y],
+								[9 * times + rect_x, -2 * times + rect_y],
+								[9 * times + rect_x, -4 * times + rect_y],
+								[7 * times + rect_x, -4 * times + rect_y],
+								[5 * times + rect_x, -7 * times + rect_y]]
+		carIcon = np.array(carIcon, np.int32)
+		cv2.fillPoly(self.filterImage, [carIcon], color)
+
 	def drawExclamationMark(self, rect_x, rect_y, rect_width, color):
 		times = rect_width
 
 		exclamationMarkUpper = [
-		                [-2 * times + rect_x, -8 * times + rect_y],
-		                [-2 * times + rect_x, 1 * times + rect_y],
-		                [2 * times + rect_x, 1 * times + rect_y],
-		                [2 * times + rect_x, -8 * times + rect_y]]
+										[-2 * times + rect_x, -8 * times + rect_y],
+										[-2 * times + rect_x, 1 * times + rect_y],
+										[2 * times + rect_x, 1 * times + rect_y],
+										[2 * times + rect_x, -8 * times + rect_y]]
 		exclamationMarkLower = [
-		                [-2 * times + rect_x, 3 * times + rect_y],
-		                [-2 * times + rect_x, 7 * times + rect_y],
-		                [2 * times + rect_x, 7 * times + rect_y],
-		                [2 * times + rect_x, 3 * times + rect_y]]
+										[-2 * times + rect_x, 3 * times + rect_y],
+										[-2 * times + rect_x, 7 * times + rect_y],
+										[2 * times + rect_x, 7 * times + rect_y],
+										[2 * times + rect_x, 3 * times + rect_y]]
 		exclamationMarkUpper = np.array(exclamationMarkUpper, np.int32)
 		exclamationMarkLower = np.array(exclamationMarkLower, np.int32)
 
@@ -103,12 +131,17 @@ class Cars(object):
 		if self.mainOutput is None:
 			return
 		self.merge_outputs()
+		self.scale_outputs()
 		cv2.imshow(self.mainOutputWindowName, self.mainOutput)
 		self.display_control_panel()
 
 	def merge_outputs(self):
 		if not self.is_day:
-			self.mainOutput = cv2.addWeighted(self.mainOutput, 1, self.filterImage, 1, 0)
+			self.mainOutput = cv2.addWeighted(self.mainOutput, 1,
+			                                  self.filterImage, 1, 0)
+
+	def scale_outputs(self):
+		self.mainOutput = cv2.resize(self.mainOutput, (1024, 576))
 
 	def display_control_panel(self):
 		cv2.imshow(self.controlPanelWindowName, self.dashboard_image)
@@ -123,19 +156,21 @@ class Cars(object):
 	def calDashboardArrow(self):
 		pt1 = (200, 205)
 		dashboard_arrow_length = 120
-		degree = (157.5+self.my_v*1.125)*math.pi/180
-		pt2 = (int(pt1[0]+dashboard_arrow_length*math.cos(degree)),
-		       int(pt1[1]+dashboard_arrow_length*math.sin(degree)))
+		degree = (157.5 + self.my_v * 1.125) * math.pi / 180
+		pt2 = (int(pt1[0] + dashboard_arrow_length * math.cos(degree)),
+		       int(pt1[1] + dashboard_arrow_length * math.sin(degree)))
 		return pt1, pt2
 
 	def display_text(self):
-		cv2.putText(self.dashboard_image, "My Velocity: " + str(self.my_v),
-		            (0, 20), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1, cv2.CV_AA)
+		cv2.putText(self.dashboard_image, "My Velocity: " + str(self.my_v), (0, 20),
+		            cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1, cv2.CV_AA)
 		cv2.putText(self.dashboard_image, "Other's Velocity: " + str(self.otherV),
-		            (0, 40), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1, cv2.CV_AA)
+		            (0, 40), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1,
+		            cv2.CV_AA)
 		cv2.putText(self.dashboard_image,
 		            "Notify Distance: " + str(self.notifyDistance),
-		            (200, 20), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1, cv2.CV_AA)
+		            (200, 20), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1,
+		            cv2.CV_AA)
 
 	def display_trackbar(self):
 		cv.CreateTrackbar(self.myVTrackbarName,
